@@ -61,16 +61,106 @@ export class MessageContentUtil {
       return [];
     }
 
-    if (Array.isArray(lastMessage.content)) {
-      return lastMessage.content;
+    const kwargs = this.isRecord(lastMessage.kwargs) ? lastMessage.kwargs : undefined;
+    const directContentItems = this.normalizeMessageContent(lastMessage.content);
+    const contentItems = directContentItems.length
+      ? directContentItems
+      : this.normalizeMessageContent(kwargs?.content);
+    const hasImageContent = contentItems.some((item) => {
+      return this.isRecord(item) && item.type === "image" && typeof item.data === "string";
+    });
+
+    if (!hasImageContent) {
+      contentItems.push(
+        ...this.getImageGenerationContentItems(lastMessage),
+        ...(kwargs ? this.getImageGenerationContentItems(kwargs) : [])
+      );
     }
 
-    const kwargs = lastMessage.kwargs;
-    if (this.isRecord(kwargs) && Array.isArray(kwargs.content)) {
-      return kwargs.content;
+    return contentItems;
+  }
+
+  private static normalizeMessageContent(content: unknown): unknown[] {
+    if (Array.isArray(content)) {
+      return content;
+    }
+
+    if (typeof content === "string" && content.trim()) {
+      return [{ type: "text", text: content }];
     }
 
     return [];
+  }
+
+  private static getImageGenerationContentItems(message: UnknownRecord): unknown[] {
+    const outputs = [
+      ...this.getArrayFromPath(message, ["additional_kwargs", "tool_outputs"]),
+      ...this.getArrayFromPath(message, ["response_metadata", "output"]),
+    ];
+    const items: unknown[] = [];
+    const seenData = new Set<string>();
+
+    for (const output of outputs) {
+      this.collectImageGenerationContentItems(output, items, seenData);
+    }
+
+    return items;
+  }
+
+  private static collectImageGenerationContentItems(
+    value: unknown,
+    items: unknown[],
+    seenData: Set<string>
+  ): void {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.collectImageGenerationContentItems(item, items, seenData);
+      }
+
+      return;
+    }
+
+    if (!this.isRecord(value)) {
+      return;
+    }
+
+    if (value.type === "image_generation_call" && typeof value.result === "string") {
+      if (!seenData.has(value.result)) {
+        seenData.add(value.result);
+        items.push({
+          type: "image",
+          data: value.result,
+          mimeType: this.imageMimeTypeFromGenerationOutput(value),
+        });
+      }
+    }
+
+    this.collectImageGenerationContentItems(value.content, items, seenData);
+  }
+
+  private static getArrayFromPath(value: UnknownRecord, pathParts: string[]): unknown[] {
+    let current: unknown = value;
+
+    for (const pathPart of pathParts) {
+      if (!this.isRecord(current)) {
+        return [];
+      }
+
+      current = current[pathPart];
+    }
+
+    return Array.isArray(current) ? current : [];
+  }
+
+  private static imageMimeTypeFromGenerationOutput(output: UnknownRecord): string {
+    const format = output.output_format ?? output.outputFormat;
+
+    if (typeof format === "string" && format.trim()) {
+      const normalizedFormat = format.toLowerCase() === "jpg" ? "jpeg" : format.toLowerCase();
+      return `image/${normalizedFormat}`;
+    }
+
+    return "image/png";
   }
 
   /**

@@ -1,9 +1,14 @@
 import { createAgent } from "langchain";
 // import { MemorySaver } from "@langchain/langgraph";
-import { model } from "../models/model.ts"
+import { model } from "../models/model.ts";
+import { requirementPrompt } from "../prompts/requirementPrompt.ts";
+import { generateSrsImageTool } from "./image-agent.ts";
 
-export const agent = createAgent({
-  model: model,
-  tools: [{ type: "image_generation" }], // 添加画图工具
+export const RequirementWriterAgent = createAgent({
+  model,
+  tools: [generateSrsImageTool],
   // checkpointer: new MemorySaver(),
+  systemPrompt: requirementPrompt,
 });
+
+export const agent = RequirementWriterAgent;
