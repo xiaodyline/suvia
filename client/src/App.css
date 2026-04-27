@@ -114,6 +114,14 @@ body {
   opacity: 0.8;
 }
 
+.markdown-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+
 .markdown-content table {
   border-collapse: collapse;
   margin: 0.4em 0;

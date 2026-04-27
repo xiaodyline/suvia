@@ -1,27 +1,32 @@
-import Router from '@koa/router';
-import { agent } from '../agents/agents.ts';
-import { JsonFileUtil } from '../utils/json-file.util.ts';
+import Router from "@koa/router";
+import { agent } from "../agents/agents.ts";
+import { JsonFileUtil } from "../utils/json-file.util.ts";
+import { MessageContentUtil } from "../utils/message-content.util.ts";
 
 type ChatMessage = {
-  role: "system" | "user" | "assistant",
-  content: string
-}
+  role: "system" | "user" | "assistant";
+  content: string;
+};
 
 type ChatRequestBody = {
   messages?: ChatMessage[];
 };
 
-type ContentItem = {
-  type: string;
-  text: string;
-  annotations: unknown[];
-  phase: string;
-};
-
-
-
 const apiRouter = new Router({
-  prefix: '/api',
+  prefix: "/api",
+});
+
+apiRouter.get("/generated-images/:fileName", async (ctx) => {
+  const image = await MessageContentUtil.readGeneratedImage(ctx.params.fileName);
+
+  if (!image) {
+    ctx.status = 404;
+    ctx.body = { error: "image not found" };
+    return;
+  }
+
+  ctx.type = image.mimeType;
+  ctx.body = image.buffer;
 });
 
 apiRouter.post("/chat", async (ctx) => {
@@ -36,16 +41,17 @@ apiRouter.post("/chat", async (ctx) => {
 
   const result = await agent.invoke({ messages });
   const lastMessage = result.messages.at(-1);
-  const filePath = await JsonFileUtil.writeJson("lastMessage.json", lastMessage, {
+
+  await JsonFileUtil.writeJson("lastMessage.json", lastMessage, {
     dir: "logs",
   });
-  // 安全获取最后一条消息的 content，只有当 content 是数组
-  const content = Array.isArray(lastMessage?.content) ? lastMessage.content : [];
-  const first_contentBlock = content.at(0) as ContentItem;
+
+  const processedContent = await MessageContentUtil.processLastMessage(lastMessage, {
+    imageUrlPrefix: `${ctx.protocol}://${ctx.host}/api/generated-images`,
+  });
 
   ctx.type = "text/plain; charset=utf-8";
-  ctx.body = first_contentBlock.text;
+  ctx.body = processedContent.responseText;
+});
 
-})
-
-export default apiRouter
+export default apiRouter;
