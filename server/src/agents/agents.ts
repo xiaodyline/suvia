@@ -4,6 +4,6 @@ import { model } from "../models/model.ts"
 
 export const agent = createAgent({
   model: model,
-  tools: [],
+  tools: [{ type: "image_generation" }], // 添加画图工具
   // checkpointer: new MemorySaver(),
 });
