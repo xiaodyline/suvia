@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "debug": "node --inspect=9229 --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "debug:index": "tsx src/index.ts"
+    "debug:index": "tsx src/index.ts",
+    "test:oss-upload": "tsx src/tests/oss-upload.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
     "@langchain/core": "^1.1.40",
     "@langchain/langgraph": "^1.2.9",
     "@langchain/openai": "^1.4.4",
+    "ali-oss": "^6.23.0",
     "deepagents": "^1.9.0",
     "dotenv": "^17.4.2",
     "koa": "^3.2.0",

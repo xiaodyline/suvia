@@ -16,19 +16,6 @@ const apiRouter = new Router({
   prefix: "/api",
 });
 
-apiRouter.get("/generated-images/:fileName", async (ctx) => {
-  const image = await MessageContentUtil.readGeneratedImage(ctx.params.fileName);
-
-  if (!image) {
-    ctx.status = 404;
-    ctx.body = { error: "image not found" };
-    return;
-  }
-
-  ctx.type = image.mimeType;
-  ctx.body = image.buffer;
-});
-
 apiRouter.post("/chat", async (ctx) => {
   const body = ctx.request.body as ChatRequestBody;
   const messages = body.messages ?? [];
@@ -46,9 +33,7 @@ apiRouter.post("/chat", async (ctx) => {
     dir: "logs",
   });
 
-  const processedContent = await MessageContentUtil.processLastMessage(lastMessage, {
-    imageUrlPrefix: `${ctx.protocol}://${ctx.host}/api/generated-images`,
-  });
+  const processedContent = await MessageContentUtil.processLastMessage(lastMessage);
 
   ctx.type = "text/plain; charset=utf-8";
   ctx.body = processedContent.responseText;

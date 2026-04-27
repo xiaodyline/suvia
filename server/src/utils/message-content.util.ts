@@ -1,32 +1,29 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { OssUploader } from "./ossUploader.ts";
 
 type UnknownRecord = Record<string, unknown>;
 
 /**
  * 处理消息内容时的可选配置。
  *
- * imageDir 用来指定图片保存目录；不传时默认保存到 logs/images。
- * imageUrlPrefix 用来指定返回给前端的图片访问地址前缀；不传时只返回本地保存结果。
+ * ossDir 用来指定图片上传到 OSS 后的对象目录；不传时使用 OssUploader 里的默认目录。
  */
 type ProcessMessageOptions = {
-  imageDir?: string;
-  imageUrlPrefix?: string;
+  ossDir?: string;
 };
 
 /**
  * 单个 content item 处理后的标准结果。
  *
  * responseText 是最终拼接给前端展示的文本，例如普通文本或 Markdown 图片链接。
- * 图片类型会额外返回 fileName、filePath、mimeType 和可访问 url。
+ * 图片类型会额外返回 fileName、ossPath、mimeType 和可访问 url。
  */
 export type ProcessedContentItem = {
   type: "text" | "image" | "unsupported";
   responseText: string;
   text?: string;
   fileName?: string;
-  filePath?: string;
+  ossPath?: string;
   mimeType?: string;
   url?: string;
   originalType?: string;
@@ -50,8 +47,7 @@ export type ProcessedMessageContent = {
  * 并按不同 content.type 分发到对应处理逻辑。
  */
 export class MessageContentUtil {
-  /** 图片默认保存目录。 */
-  static readonly DEFAULT_IMAGE_DIR = path.resolve("logs", "images");
+  private static ossUploader?: OssUploader;
 
   /**
    * 从最后一条消息中提取 content 数组。
@@ -80,7 +76,7 @@ export class MessageContentUtil {
   /**
    * 处理最后一条消息中的所有 content item。
    *
-   * 文本会原样返回；图片会解码 base64 并保存到本地，
+   * 文本会原样返回；图片会解码 base64 并上传到 OSS，
    * 最后把所有处理结果合并成一个 responseText。
    */
   static async processLastMessage(
@@ -104,47 +100,10 @@ export class MessageContentUtil {
   }
 
   /**
-   * 根据文件名读取已经保存过的生成图片。
-   *
-   * 只允许读取图片目录下的单个文件名，避免通过 ../ 访问其它路径。
-   * 找不到图片时返回 null。
-   */
-  static async readGeneratedImage(
-    fileName: string,
-    options: Pick<ProcessMessageOptions, "imageDir"> = {}
-  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
-    const safeFileName = path.basename(fileName);
-    if (safeFileName !== fileName) {
-      return null;
-    }
-
-    const imageDir = path.resolve(options.imageDir ?? this.DEFAULT_IMAGE_DIR);
-    const filePath = path.resolve(imageDir, safeFileName);
-    const relativePath = path.relative(imageDir, filePath);
-
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-      return null;
-    }
-
-    try {
-      return {
-        buffer: await fs.readFile(filePath),
-        mimeType: this.mimeTypeFromFileName(safeFileName),
-      };
-    } catch (error) {
-      if (this.isNodeError(error) && error.code === "ENOENT") {
-        return null;
-      }
-
-      throw error;
-    }
-  }
-
-  /**
    * 按 content.type 分发处理逻辑。
    *
    * text / output_text 走文本处理；
-   * image 走图片保存处理；
+   * image 走图片上传处理；
    * 其它类型统一返回 unsupported。
    */
   private static async processContentItem(
@@ -183,7 +142,7 @@ export class MessageContentUtil {
    * 处理图片内容。
    *
    * 图片 data 是 base64 字符串，支持普通 base64 和 data URL；
-   * 处理后会写入本地文件，并在配置了 imageUrlPrefix 时返回 Markdown 图片链接。
+   * 处理后会上传到 OSS，并返回 Markdown 图片链接。
    */
   private static async processImageContent(
     item: UnknownRecord,
@@ -201,26 +160,24 @@ export class MessageContentUtil {
         ? mimeTypeValue
         : "image/png";
 
-    const imageDir = path.resolve(options.imageDir ?? this.DEFAULT_IMAGE_DIR);
     const extension = this.extensionFromMimeType(mimeType);
     const fileName = `image-${Date.now()}-${randomUUID()}.${extension}`;
-    const filePath = path.resolve(imageDir, fileName);
     const imageBuffer = Buffer.from(this.normalizeBase64Data(data), "base64");
+    const uploadResult = await this.getOssUploader().uploadBuffer(
+      imageBuffer,
+      fileName,
+      mimeType,
+      options.ossDir
+    );
 
-    await fs.mkdir(imageDir, { recursive: true });
-    await fs.writeFile(filePath, imageBuffer);
-
-    const url = this.buildImageUrl(options.imageUrlPrefix, fileName);
-    const responseText = url
-      ? `![generated image](${url})`
-      : `图片已保存到：\`${filePath}\``;
+    const responseText = `![generated image](${uploadResult.url})`;
 
     return {
       type: "image",
       fileName,
-      filePath,
+      ossPath: uploadResult.ossPath,
       mimeType,
-      url,
+      url: uploadResult.url,
       responseText,
     };
   }
@@ -247,18 +204,6 @@ export class MessageContentUtil {
     return data.replace(/^data:[^;]+;base64,/i, "").replace(/\s/g, "");
   }
 
-  /** 使用 URL 前缀和文件名拼出前端可访问的图片地址。 */
-  private static buildImageUrl(
-    imageUrlPrefix: string | undefined,
-    fileName: string
-  ): string | undefined {
-    if (!imageUrlPrefix) {
-      return undefined;
-    }
-
-    return `${imageUrlPrefix.replace(/\/$/, "")}/${encodeURIComponent(fileName)}`;
-  }
-
   /** 根据图片 MIME 类型推导保存文件的扩展名。 */
   private static extensionFromMimeType(mimeType: string): string {
     const extensions: Record<string, string> = {
@@ -279,27 +224,15 @@ export class MessageContentUtil {
     return extensions[normalizedMimeType] ?? fallbackExtension ?? "png";
   }
 
-  /** 根据文件扩展名推导响应图片时使用的 MIME 类型。 */
-  private static mimeTypeFromFileName(fileName: string): string {
-    const mimeTypes: Record<string, string> = {
-      ".gif": "image/gif",
-      ".jpeg": "image/jpeg",
-      ".jpg": "image/jpeg",
-      ".png": "image/png",
-      ".svg": "image/svg+xml",
-      ".webp": "image/webp",
-    };
-
-    return mimeTypes[path.extname(fileName).toLowerCase()] ?? "application/octet-stream";
-  }
-
   /** 判断 unknown 值是否是可读取属性的对象。 */
   private static isRecord(value: unknown): value is UnknownRecord {
     return typeof value === "object" && value !== null;
   }
 
-  /** 判断异常是否是 Node.js 文件系统错误。 */
-  private static isNodeError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && "code" in error;
+  /** 懒加载 OSS 上传器，避免纯文本回复也强依赖 OSS 环境变量。 */
+  private static getOssUploader(): OssUploader {
+    this.ossUploader ??= new OssUploader();
+
+    return this.ossUploader;
   }
 }
