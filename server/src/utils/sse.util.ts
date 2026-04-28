@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 import type { SseEventName } from "../services/chat/chat.types.ts";
+import type { SrsQualityResult } from "../services/srs-quality/srs-quality.types.ts";
 
 export const canWrite = (res: ServerResponse) => {
   return !res.destroyed && !res.writableEnded;
@@ -40,6 +41,8 @@ export const createSseWriter = (res: ServerResponse) => {
       writeSseEvent(res, event, data),
     text: (delta: string) => writeSseEvent(res, "text", { delta }),
     status: (message: string) => writeSseEvent(res, "status", { message }),
+    quality: (quality: SrsQualityResult) =>
+      writeSseEvent(res, "quality", quality),
     done: () => writeSseEvent(res, "done", {}),
     error: (message: string) => writeSseEvent(res, "error", { message }),
     end: () => endSse(res),

@@ -5,7 +5,8 @@ export type LogScope =
   | "AGENT"
   | "SERVER"
   | "CHAT"
-  | "TOOL";
+  | "TOOL"
+  | "QUALITY";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogFields = Record<string, unknown>;

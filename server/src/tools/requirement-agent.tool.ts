@@ -2,6 +2,8 @@ import { tool } from "langchain";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import * as z from "zod";
 import { getRequirementWriterAgent } from "../agents/requirement.agent.ts";
+import { srsQualityPipeline } from "../services/srs-quality/srs-quality.pipeline.ts";
+import { srsQualityResultStore } from "../services/srs-quality/srs-quality-result.store.ts";
 import { logger } from "../utils/logger.ts";
 
 type UnknownRecord = Record<string, unknown>;
@@ -88,6 +90,19 @@ const extractFinalText = (result: unknown): string => {
   return extractTextFromMessage(result).trim();
 };
 
+const getQualityResultStoreKey = (config?: RunnableConfig) => {
+  const configurable = isRecord(config?.configurable)
+    ? config.configurable
+    : undefined;
+  const threadId = configurable?.thread_id;
+
+  if (typeof threadId !== "string" || !threadId.trim()) {
+    return undefined;
+  }
+
+  return threadId.trim();
+};
+
 const hasExplicitImageRequirement = (
   input: z.infer<typeof requirementWriterAgentToolSchema>
 ) => {
@@ -157,7 +172,16 @@ export const requirementWriterAgentTool = tool(
         throw new Error("RequirementWriterAgent returned no text content.");
       }
 
-      return finalText;
+      const pipelineResult = await srsQualityPipeline.run(finalText);
+      const qualityResultStoreKey = getQualityResultStoreKey(config);
+
+      if (qualityResultStoreKey) {
+        srsQualityResultStore.set(qualityResultStoreKey, pipelineResult.quality);
+      } else {
+        logger.warn("QUALITY", "SRS quality result skipped: missing thread_id");
+      }
+
+      return pipelineResult.document;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown RequirementWriterAgent error.";

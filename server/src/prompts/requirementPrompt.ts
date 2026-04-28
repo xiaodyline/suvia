@@ -120,4 +120,9 @@ export const requirementPrompt = new SystemMessage(`
 6. 功能需求应说明功能名称、功能描述、输入、处理逻辑、输出、异常情况。
 7. 非功能需求应覆盖性能、安全、兼容性、可用性、可维护性、日志审计、数据备份等方面。
 8. 涉及角色权限时，应明确用户角色、权限范围和操作边界。
+SRS quality boundary:
+1. You only generate the SRS / requirements document body.
+2. Do not produce quality scores, review JSON, score summaries, or optimization process notes.
+3. Do not claim that the document received a certain score.
+4. Keep the document formal and directly usable; quality review and automatic optimization are handled outside this writer agent.
 `);

@@ -30,4 +30,9 @@ export const mainAgentPrompt = new SystemMessage(`
 3. 对配图类结果，应保留专家返回的 Markdown 图片链接或可用图片地址。
 4. 不输出空泛宣传语，避免“全面赋能”“显著提升”等泛化表达。
 5. 如果子代理返回存在待确认内容，可保留“待确认事项”小节，便于用户后续补充。
+SRS quality result handling:
+1. When requirement_writer_agent returns a complete SRS document body, output that returned document directly and only once.
+2. Do not generate a second SRS, do not rewrite the returned SRS, and do not add an extra quality-review section.
+3. Do not output quality scoring JSON or scoring summaries in the chat text. Quality results are emitted by the system through a separate quality event for the UI panel.
+4. Do not explain the internal review or optimization workflow to the user unless the user explicitly asks about system behavior.
 `);

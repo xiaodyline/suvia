@@ -2,6 +2,7 @@ import {
   getInitializedCheckpointType,
   initCheckpointer,
 } from "../checkpoints/checkpointer.provider.ts";
+import { logSrsQualityConfig } from "../services/srs-quality/srs-quality.config.ts";
 import { logger } from "../utils/logger.ts";
 import { createMainAgent, type MainAgent } from "./main.agent.ts";
 
@@ -17,10 +18,14 @@ export const initAgent = async () => {
     .then((checkpointer) => {
       logger.info("AGENT", "Creating MainAgent");
       logger.info("AGENT", `Checkpointer=${getInitializedCheckpointType()}`);
+      logSrsQualityConfig();
 
       agent = createMainAgent({ checkpointer });
 
-      logger.info("AGENT", "Sub agents=RequirementWriterAgent");
+      logger.info(
+        "AGENT",
+        "Sub agents=RequirementWriterAgent,SrsReviewAgent,SrsOptimizeAgent"
+      );
       logger.info("AGENT", "MainAgent ready");
 
       return agent;

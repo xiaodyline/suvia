@@ -3,6 +3,7 @@ import { getAgent } from "../../agents/index.ts";
 import { JsonFileUtil } from "../../utils/json-file.util.ts";
 import { logger } from "../../utils/logger.ts";
 import { createSseWriter, setupSseHeaders } from "../../utils/sse.util.ts";
+import { srsQualityResultStore } from "../srs-quality/srs-quality-result.store.ts";
 import { getLastMessage } from "./chat-message-extractor.ts";
 import { processChatStream } from "./chat-stream.service.ts";
 import type { ChatStreamMode, ValidatedChatRequest } from "./chat.types.ts";
@@ -74,8 +75,16 @@ const handleChat = async (
       });
     }
 
+    const qualityResult = srsQualityResultStore.take(request.sessionId);
+
+    if (qualityResult) {
+      sseWriter.quality(qualityResult);
+    }
+
     sseWriter.done();
   } catch (error) {
+    srsQualityResultStore.delete(request.sessionId);
+
     if (!clientClosed && !abortController.signal.aborted) {
       logger.error("CHAT", "Request failed", error, {
         sessionId: request.loggedSessionId,

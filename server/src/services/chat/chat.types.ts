@@ -17,6 +17,6 @@ export type ValidatedChatRequest = {
   loggedSessionId: string;
 };
 
-export type SseEventName = "text" | "status" | "done" | "error";
+export type SseEventName = "text" | "status" | "done" | "error" | "quality";
 
 export type ChatStreamMode = "messages" | "tools" | "values";

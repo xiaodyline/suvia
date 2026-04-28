@@ -10,6 +10,8 @@ const SUBAGENT_MARKERS = [
   "subagent",
   "requirement_writer_agent",
   "image_agent",
+  "srs_review_agent",
+  "srs_optimize_agent",
 ];
 
 export const getNestedMetadata = (
