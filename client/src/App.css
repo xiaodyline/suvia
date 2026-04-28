@@ -49,6 +49,11 @@ body {
   border: 1px solid #e5e7eb;
 }
 
+.message-status {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
 .composer {
   display: grid;
   grid-template-columns: 1fr auto;
