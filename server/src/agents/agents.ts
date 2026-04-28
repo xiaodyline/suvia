@@ -1,17 +1,12 @@
-import { createAgent } from "langchain";
 import {
   getInitializedCheckpointType,
   initCheckpointer,
 } from "../checkpoints/checkpointer.provider.ts";
-import { model } from "../models/model.ts";
-import { requirementPrompt } from "../prompts/requirementPrompt.ts";
 import { logger } from "../utils/logger.ts";
-import { generateSrsImageTool } from "./image-agent.ts";
+import { createMainAgent, type MainAgent } from "./main-agent.ts";
 
-type RequirementAgent = ReturnType<typeof createAgent>;
-
-let agent: RequirementAgent | undefined;
-let initializationPromise: Promise<RequirementAgent> | undefined;
+let agent: MainAgent | undefined;
+let initializationPromise: Promise<MainAgent> | undefined;
 
 export const initAgent = async () => {
   if (agent) {
@@ -20,23 +15,18 @@ export const initAgent = async () => {
 
   initializationPromise ??= initCheckpointer()
     .then((checkpointer) => {
-      logger.info("AGENT", "Creating RequirementWriterAgent");
-      logger.info("AGENT", "Tools=generate_srs_image");
+      logger.info("AGENT", "Creating MainAgent");
       logger.info("AGENT", `Checkpointer=${getInitializedCheckpointType()}`);
 
-      agent = createAgent({
-        model,
-        tools: [generateSrsImageTool],
-        checkpointer,
-        systemPrompt: requirementPrompt,
-      });
+      agent = createMainAgent({ checkpointer });
 
-      logger.info("AGENT", "RequirementWriterAgent ready");
+      logger.info("AGENT", "Sub agents=RequirementWriterAgent");
+      logger.info("AGENT", "MainAgent ready");
 
       return agent;
     })
     .catch((error) => {
-      logger.error("AGENT", "RequirementWriterAgent initialization failed", error);
+      logger.error("AGENT", "MainAgent initialization failed", error);
       initializationPromise = undefined;
       throw error;
     });
