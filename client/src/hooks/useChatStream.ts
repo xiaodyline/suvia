@@ -77,7 +77,18 @@ const appendAssistantError = (
 export const useChatStream = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [sessionId] = useState(getOrCreateSessionId);
+  const [sessionId, setSessionId] = useState(getOrCreateSessionId);
+
+  const newChat = () => {
+    if (isSending) {
+      return;
+    }
+
+    const nextSessionId = crypto.randomUUID();
+    localStorage.setItem(SESSION_ID_STORAGE_KEY, nextSessionId);
+    setSessionId(nextSessionId);
+    setMessages([]);
+  };
 
   const sendMessage = async (input: string) => {
     const text = input.trim();
@@ -147,5 +158,6 @@ export const useChatStream = () => {
     messages,
     isSending,
     sendMessage,
+    newChat,
   };
 };

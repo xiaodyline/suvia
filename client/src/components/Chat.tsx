@@ -4,7 +4,7 @@ import { useChatStream } from "../hooks/useChatStream";
 
 export function Chat() {
   const [input, setInput] = useState("");
-  const { messages, isSending, sendMessage } = useChatStream();
+  const { messages, isSending, sendMessage, newChat } = useChatStream();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,6 +35,14 @@ export function Chat() {
       </section>
 
       <form className="composer" onSubmit={handleSubmit}>
+        <button
+          className="new-chat-button"
+          type="button"
+          onClick={newChat}
+          disabled={isSending}
+        >
+          新建聊天
+        </button>
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
