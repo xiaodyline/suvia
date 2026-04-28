@@ -10,11 +10,13 @@ export type ChatRequestMessage = {
 };
 
 export type StreamChatOptions = SseStreamHandlers & {
+  sessionId: string;
   messages: ChatRequestMessage[];
   signal?: AbortSignal;
 };
 
 export const streamChat = async ({
+  sessionId,
   messages,
   signal,
   onText,
@@ -24,7 +26,7 @@ export const streamChat = async ({
 }: StreamChatOptions) => {
   const response = await request("/api/chat", {
     method: "POST",
-    body: { messages },
+    body: { sessionId, messages },
     signal,
   });
 

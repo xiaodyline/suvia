@@ -10,6 +10,7 @@ type ChatMessage = {
 
 type ChatRequestBody = {
   messages?: ChatMessage[];
+  sessionId?: string;
 };
 
 const apiRouter = new Router({
@@ -111,10 +112,17 @@ const getLastMessage = (state: unknown): unknown => {
 apiRouter.post("/chat", async (ctx) => {
   const body = ctx.request.body as ChatRequestBody;
   const messages = body.messages ?? [];
+  const sessionId = body.sessionId?.trim();
 
   if (messages.length === 0) {
     ctx.status = 400;
     ctx.body = { error: "messages 不能为空" };
+    return;
+  }
+
+  if (!sessionId) {
+    ctx.status = 400;
+    ctx.body = { error: "sessionId 不能为空" };
     return;
   }
 
@@ -143,6 +151,9 @@ apiRouter.post("/chat", async (ctx) => {
       { messages },
       {
         streamMode: ["messages", "tools", "values"],
+        configurable: {
+          thread_id: sessionId,
+        },
         signal: abortController.signal,
       }
     );

@@ -9,6 +9,20 @@ export type ChatMessage = {
   status?: string;
 };
 
+const SESSION_ID_STORAGE_KEY = "suvia_session_id";
+
+const getOrCreateSessionId = () => {
+  const existingSessionId = localStorage.getItem(SESSION_ID_STORAGE_KEY)?.trim();
+
+  if (existingSessionId) {
+    return existingSessionId;
+  }
+
+  const sessionId = crypto.randomUUID();
+  localStorage.setItem(SESSION_ID_STORAGE_KEY, sessionId);
+  return sessionId;
+};
+
 const getErrorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : "请求失败：未知错误";
 };
@@ -63,6 +77,7 @@ const appendAssistantError = (
 export const useChatStream = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [sessionId] = useState(getOrCreateSessionId);
 
   const sendMessage = async (input: string) => {
     const text = input.trim();
@@ -84,12 +99,13 @@ export const useChatStream = () => {
       status: "正在思考...",
     };
 
-    const requestMessages = toChatRequestMessages([...messages, userMessage]);
+    const requestMessages = toChatRequestMessages([userMessage]);
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setIsSending(true);
 
     try {
       await streamChat({
+        sessionId,
         messages: requestMessages,
         onText: (delta) => {
           setMessages((current) =>
