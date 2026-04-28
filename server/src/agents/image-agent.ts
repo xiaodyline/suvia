@@ -1,9 +1,12 @@
 import { tools } from "@langchain/openai";
 import { createAgent, tool } from "langchain";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import * as z from "zod";
 import { model } from "../models/model.ts";
 import { imageAgentPrompt } from "../prompts/imageAgentPrompt.ts";
 import { MessageContentUtil } from "../utils/message-content.util.ts";
+
+type UnknownRecord = Record<string, unknown>;
 
 const imageTaskSchema = z.object({
   title: z.string().describe("插图标题，用于最终 SRS 文档中的图题或 alt 文本。"),
@@ -39,16 +42,30 @@ const buildImageAgentUserPrompt = (task: z.infer<typeof imageTaskSchema>) => {
   ].join("\n");
 };
 
+const isRecord = (value: unknown): value is UnknownRecord => {
+  return typeof value === "object" && value !== null;
+};
+
 export const generateSrsImageTool = tool(
-  async (task) => {
-    const result = await ImageAgent.invoke({
-      messages: [
-        {
-          role: "user",
-          content: buildImageAgentUserPrompt(task),
+  async (task, config?: RunnableConfig) => {
+    const result = await ImageAgent.invoke(
+      {
+        messages: [
+          {
+            role: "user",
+            content: buildImageAgentUserPrompt(task),
+          },
+        ],
+      },
+      {
+        ...config,
+        tags: Array.from(new Set([...(config?.tags ?? []), "subagent", "image_agent"])),
+        metadata: {
+          ...(isRecord(config?.metadata) ? config.metadata : {}),
+          source: "image_agent",
         },
-      ],
-    });
+      }
+    );
 
     const lastMessage = result.messages.at(-1);
     const processedContent = await MessageContentUtil.processLastMessage(lastMessage, {

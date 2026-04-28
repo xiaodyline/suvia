@@ -1,4 +1,5 @@
 import { tool } from "langchain";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import * as z from "zod";
 import { getRequirementWriterAgent } from "../agents/requirement-agent.ts";
 import { logger } from "../utils/logger.ts";
@@ -87,6 +88,18 @@ const extractFinalText = (result: unknown): string => {
   return extractTextFromMessage(result).trim();
 };
 
+const hasExplicitImageRequirement = (
+  input: z.infer<typeof requirementWriterAgentToolSchema>
+) => {
+  const text = [input.task, input.context, input.styleRequirements]
+    .filter(Boolean)
+    .join("\n");
+
+  return /生成.*图|画.*图|配图|插图|功能结构图|功能模块图|业务流程图|系统架构图|数据流图|页面草图|原型图|结构图|流程图|架构图/.test(
+    text
+  );
+};
+
 const buildRequirementWriterPrompt = (
   input: z.infer<typeof requirementWriterAgentToolSchema>
 ) => {
@@ -95,13 +108,21 @@ const buildRequirementWriterPrompt = (
     `任务：${input.task}`,
     input.context ? `上下文：\n${input.context}` : "",
     input.styleRequirements ? `格式与风格要求：\n${input.styleRequirements}` : "",
+    hasExplicitImageRequirement(input)
+      ? [
+          "图片生成硬性要求：",
+          "1. 当前任务包含明确的图片/图表生成要求，必须调用 generate_srs_image 工具生成真实图片。",
+          "2. 不得用 Mermaid、flowchart、PlantUML、ASCII 图、Markdown 代码块或文字图代替图片。",
+          "3. 最终文档中必须使用 generate_srs_image 返回的 Markdown 图片链接。",
+        ].join("\n")
+      : "",
   ]
     .filter(Boolean)
     .join("\n\n");
 };
 
 export const requirementWriterAgentTool = tool(
-  async (input) => {
+  async (input, config?: RunnableConfig) => {
     logger.info("TOOL", "requirement_writer_agent invoked", {
       "task.length": input.task.length,
       "context.provided": Boolean(input.context),
@@ -110,14 +131,26 @@ export const requirementWriterAgentTool = tool(
 
     try {
       const requirementWriterAgent = getRequirementWriterAgent();
-      const result = await requirementWriterAgent.invoke({
-        messages: [
-          {
-            role: "user",
-            content: buildRequirementWriterPrompt(input),
+      const result = await requirementWriterAgent.invoke(
+        {
+          messages: [
+            {
+              role: "user",
+              content: buildRequirementWriterPrompt(input),
+            },
+          ],
+        },
+        {
+          ...config,
+          tags: Array.from(
+            new Set([...(config?.tags ?? []), "subagent", "requirement_writer_agent"])
+          ),
+          metadata: {
+            ...(isRecord(config?.metadata) ? config.metadata : {}),
+            source: "requirement_writer_agent",
           },
-        ],
-      });
+        }
+      );
       const finalText = extractFinalText(result);
 
       if (!finalText) {
@@ -136,7 +169,6 @@ export const requirementWriterAgentTool = tool(
     name: "requirement_writer_agent",
     description:
       "用于编写需求分析说明书、SRS、项目概述、功能需求、非功能需求、系统边界、用户角色、业务流程、软件需求文档，以及处理需求文档配图、功能结构图等相关任务。",
-    schema: requirementWriterAgentToolSchema,
-    returnDirect: true,
+    schema: requirementWriterAgentToolSchema
   }
 );
