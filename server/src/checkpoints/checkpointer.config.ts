@@ -9,7 +9,12 @@ dotenv.config();
 const DEFAULT_CHECKPOINT_ENABLED = true;
 const DEFAULT_CHECKPOINT_TYPE: CheckpointType = "memory";
 const DEFAULT_CHECKPOINT_SQLITE_PATH = "./data/suvia-checkpoints.sqlite";
-const CHECKPOINT_TYPES = new Set<CheckpointType>(["none", "memory", "sqlite"]);
+const CHECKPOINT_TYPES = new Set<CheckpointType>([
+  "none",
+  "memory",
+  "sqlite",
+  "postgres",
+]);
 
 const serverRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -45,7 +50,7 @@ const parseCheckpointType = (value: string | undefined): CheckpointType => {
 
   if (!CHECKPOINT_TYPES.has(type)) {
     throw new Error(
-      `Invalid CHECKPOINT_TYPE "${value}". Expected one of: none, memory, sqlite.`
+      `Invalid CHECKPOINT_TYPE "${value}". Expected one of: none, memory, sqlite, postgres.`
     );
   }
 
@@ -70,6 +75,14 @@ const ensureSqliteDirectory = (sqlitePath: string) => {
   mkdirSync(path.dirname(sqlitePath), { recursive: true });
 };
 
+const resolvePostgresUrl = () => {
+  return (
+    process.env.CHECKPOINT_POSTGRES_URL?.trim() ||
+    process.env.DATABASE_URL?.trim() ||
+    undefined
+  );
+};
+
 export const getCheckpointerConfig = (): CheckpointerConfig => {
   const enabled = parseBooleanEnv(
     process.env.CHECKPOINT_ENABLED,
@@ -79,14 +92,22 @@ export const getCheckpointerConfig = (): CheckpointerConfig => {
     ? parseCheckpointType(process.env.CHECKPOINT_TYPE)
     : DEFAULT_CHECKPOINT_TYPE;
   const sqlitePath = resolveSqlitePath(process.env.CHECKPOINT_SQLITE_PATH);
+  const postgresUrl = resolvePostgresUrl();
 
   if (enabled && type === "sqlite") {
     ensureSqliteDirectory(sqlitePath);
+  }
+
+  if (enabled && type === "postgres" && !postgresUrl) {
+    throw new Error(
+      "CHECKPOINT_TYPE=postgres requires CHECKPOINT_POSTGRES_URL or DATABASE_URL."
+    );
   }
 
   return {
     enabled,
     type,
     sqlitePath,
+    postgresUrl,
   };
 };

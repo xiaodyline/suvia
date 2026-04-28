@@ -1,6 +1,6 @@
 import Router from "@koa/router";
 import type { ServerResponse } from "node:http";
-import { agent } from "../agents/agents.ts";
+import { getAgent } from "../agents/agents.ts";
 import { JsonFileUtil } from "../utils/json-file.util.ts";
 
 type ChatMessage = {
@@ -29,7 +29,11 @@ const canWrite = (res: ServerResponse) => {
   return !res.destroyed && !res.writableEnded;
 };
 
-const writeSseEvent = (res: ServerResponse, event: SseEventName, data: unknown) => {
+const writeSseEvent = (
+  res: ServerResponse,
+  event: SseEventName,
+  data: unknown
+) => {
   if (!canWrite(res)) {
     return false;
   }
@@ -59,7 +63,9 @@ const extractTextFromContent = (content: unknown): string => {
       }
 
       if (
-        (item.type === "text" || item.type === "output_text" || item.type === undefined) &&
+        (item.type === "text" ||
+          item.type === "output_text" ||
+          item.type === undefined) &&
         typeof item.text === "string"
       ) {
         return item.text;
@@ -126,6 +132,18 @@ apiRouter.post("/chat", async (ctx) => {
     return;
   }
 
+  let activeAgent: ReturnType<typeof getAgent>;
+
+  try {
+    activeAgent = getAgent();
+  } catch (error) {
+    ctx.status = 503;
+    ctx.body = {
+      error: error instanceof Error ? error.message : "Agent is not initialized.",
+    };
+    return;
+  }
+
   const abortController = new AbortController();
   const res = ctx.res;
   let clientClosed = false;
@@ -147,7 +165,7 @@ apiRouter.post("/chat", async (ctx) => {
   });
 
   try {
-    const stream = await agent.stream(
+    const stream = await activeAgent.stream(
       { messages },
       {
         streamMode: ["messages", "tools", "values"],
@@ -203,7 +221,8 @@ apiRouter.post("/chat", async (ctx) => {
   } catch (error) {
     if (!clientClosed && !abortController.signal.aborted) {
       writeSseEvent(res, "error", {
-        message: error instanceof Error ? error.message : "流式响应失败：未知错误",
+        message:
+          error instanceof Error ? error.message : "流式响应失败：未知错误",
       });
     }
   } finally {

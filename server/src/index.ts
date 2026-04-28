@@ -1,6 +1,7 @@
 import Koa from "koa";
 import cors from "@koa/cors";
 import bodyParser from "koa-bodyparser";
+import { initAgent } from "./agents/agents.ts";
 import apiRouter from "./router/api.ts";
 
 
@@ -19,6 +20,15 @@ app.use(bodyParser());
 app.use(apiRouter.routes());
 app.use(apiRouter.allowedMethods());
 
-app.listen(3001, () => {
-  console.log("Koa API running at http://localhost:3001");
+const startServer = async () => {
+  await initAgent();
+
+  app.listen(3001, () => {
+    console.log("Koa API running at http://localhost:3001");
+  });
+};
+
+startServer().catch((error) => {
+  console.error("Failed to start Koa API:", error);
+  process.exit(1);
 });
