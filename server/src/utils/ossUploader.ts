@@ -4,7 +4,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import dotenv from 'dotenv'
 
-dotenv.config()
+dotenv.config({ quiet: true })
 
 export interface UploadBase64ImageOptions {
   base64: string

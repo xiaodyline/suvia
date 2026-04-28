@@ -1,7 +1,11 @@
 import { createAgent } from "langchain";
-import { initCheckpointer } from "../checkpoints/checkpointer.provider.ts";
+import {
+  getInitializedCheckpointType,
+  initCheckpointer,
+} from "../checkpoints/checkpointer.provider.ts";
 import { model } from "../models/model.ts";
 import { requirementPrompt } from "../prompts/requirementPrompt.ts";
+import { logger } from "../utils/logger.ts";
 import { generateSrsImageTool } from "./image-agent.ts";
 
 type RequirementAgent = ReturnType<typeof createAgent>;
@@ -16,6 +20,10 @@ export const initAgent = async () => {
 
   initializationPromise ??= initCheckpointer()
     .then((checkpointer) => {
+      logger.info("AGENT", "Creating RequirementWriterAgent");
+      logger.info("AGENT", "Tools=generate_srs_image");
+      logger.info("AGENT", `Checkpointer=${getInitializedCheckpointType()}`);
+
       agent = createAgent({
         model,
         tools: [generateSrsImageTool],
@@ -23,9 +31,12 @@ export const initAgent = async () => {
         systemPrompt: requirementPrompt,
       });
 
+      logger.info("AGENT", "RequirementWriterAgent ready");
+
       return agent;
     })
     .catch((error) => {
+      logger.error("AGENT", "RequirementWriterAgent initialization failed", error);
       initializationPromise = undefined;
       throw error;
     });

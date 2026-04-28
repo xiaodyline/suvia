@@ -1,8 +1,7 @@
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 
-// 模块被导入时，统一加载一次模型配置。
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const OPENAI_API_URL = process.env.OPENAI_API_URL || "https://api.openai.com/v1";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;

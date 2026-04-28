@@ -3,8 +3,9 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CheckpointerConfig, CheckpointType } from "./types.ts";
+import { getLogLevel, logger, maskDatabaseUrl } from "../utils/logger.ts";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const DEFAULT_CHECKPOINT_ENABLED = true;
 const DEFAULT_CHECKPOINT_TYPE: CheckpointType = "memory";
@@ -20,6 +21,8 @@ const serverRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../.."
 );
+
+let hasLoggedConfig = false;
 
 const parseBooleanEnv = (value: string | undefined, defaultValue: boolean) => {
   if (value === undefined || value.trim() === "") {
@@ -83,6 +86,47 @@ const resolvePostgresUrl = () => {
   );
 };
 
+const logCheckpointerConfig = (config: CheckpointerConfig) => {
+  if (hasLoggedConfig) {
+    return;
+  }
+
+  hasLoggedConfig = true;
+
+  logger.info("CONFIG", "Environment loaded");
+  logger.info("CONFIG", `CHECKPOINT_ENABLED=${config.enabled}`);
+  logger.info("CONFIG", `CHECKPOINT_TYPE=${config.type}`);
+
+  if (process.env.CHECKPOINT_POSTGRES_URL?.trim()) {
+    logger.info(
+      "CONFIG",
+      `CHECKPOINT_POSTGRES_URL=${maskDatabaseUrl(process.env.CHECKPOINT_POSTGRES_URL.trim())}`
+    );
+  } else if (process.env.DATABASE_URL?.trim()) {
+    logger.info("CONFIG", `DATABASE_URL=${maskDatabaseUrl(process.env.DATABASE_URL.trim())}`);
+  }
+
+  logger.info("CONFIG", `LOG_LEVEL=${getLogLevel()}`);
+};
+
+export const getEffectiveCheckpointType = (config: CheckpointerConfig): CheckpointType => {
+  return config.enabled ? config.type : "none";
+};
+
+export const formatSqlitePathForLog = (sqlitePath: string) => {
+  if (sqlitePath === ":memory:" || !path.isAbsolute(sqlitePath)) {
+    return sqlitePath;
+  }
+
+  const relativePath = path.relative(serverRoot, sqlitePath);
+
+  if (relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return `./${relativePath.split(path.sep).join("/")}`;
+  }
+
+  return sqlitePath;
+};
+
 export const getCheckpointerConfig = (): CheckpointerConfig => {
   const enabled = parseBooleanEnv(
     process.env.CHECKPOINT_ENABLED,
@@ -104,10 +148,14 @@ export const getCheckpointerConfig = (): CheckpointerConfig => {
     );
   }
 
-  return {
+  const config = {
     enabled,
     type,
     sqlitePath,
     postgresUrl,
   };
+
+  logCheckpointerConfig(config);
+
+  return config;
 };
