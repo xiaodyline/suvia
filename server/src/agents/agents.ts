@@ -1,10 +1,10 @@
 import { createAgent } from "langchain";
-import { MemorySaver } from "@langchain/langgraph";
+import { getCheckpointer } from "../checkpoints/checkpointer.provider.ts";
 import { model } from "../models/model.ts";
 import { requirementPrompt } from "../prompts/requirementPrompt.ts";
 import { generateSrsImageTool } from "./image-agent.ts";
 
-const checkpointer = new MemorySaver();
+const checkpointer = getCheckpointer();
 
 export const RequirementWriterAgent = createAgent({
   model,

@@ -6,6 +6,10 @@ build/
 
 .env
 *.log
+server/data/
+*.sqlite
+*.sqlite3
+*.db
 
 .vscode/
 
