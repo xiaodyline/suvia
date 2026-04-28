@@ -2,7 +2,7 @@ import { tools } from "@langchain/openai";
 import { createAgent, tool } from "langchain";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import * as z from "zod";
-import { model } from "../models/model.ts";
+import { model } from "../models/index.ts";
 import { imageAgentPrompt } from "../prompts/imageAgentPrompt.ts";
 import { MessageContentUtil } from "../utils/message-content.util.ts";
 

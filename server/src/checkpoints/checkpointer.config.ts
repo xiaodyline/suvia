@@ -1,11 +1,9 @@
-import dotenv from "dotenv";
+import "../config/env.ts";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CheckpointerConfig, CheckpointType } from "./types.ts";
 import { getLogLevel, logger, maskDatabaseUrl } from "../utils/logger.ts";
-
-dotenv.config({ quiet: true });
 
 const DEFAULT_CHECKPOINT_ENABLED = true;
 const DEFAULT_CHECKPOINT_TYPE: CheckpointType = "memory";

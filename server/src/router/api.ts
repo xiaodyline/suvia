@@ -1,6 +1,6 @@
 import Router from "@koa/router";
 import type { ServerResponse } from "node:http";
-import { getAgent } from "../agents/agents.ts";
+import { getAgent } from "../agents/index.ts";
 import { JsonFileUtil } from "../utils/json-file.util.ts";
 import { logger } from "../utils/logger.ts";
 

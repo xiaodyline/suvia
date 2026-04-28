@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { createAgent, providerStrategy } from "langchain";
-import { model } from "../models/model.ts"
+import { model } from "../models/index.ts"
 
 const ContactInfo = z.object({
   name: z.string().describe("The name of the person"),

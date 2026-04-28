@@ -2,9 +2,7 @@
 import OSS from 'ali-oss'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import dotenv from 'dotenv'
-
-dotenv.config({ quiet: true })
+import '../config/env.ts'
 
 export interface UploadBase64ImageOptions {
   base64: string

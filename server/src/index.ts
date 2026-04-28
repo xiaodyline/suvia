@@ -1,7 +1,8 @@
+import "./config/env.ts";
 import Koa from "koa";
 import cors from "@koa/cors";
 import bodyParser from "koa-bodyparser";
-import { initAgent } from "./agents/agents.ts";
+import { initAgent } from "./agents/index.ts";
 import apiRouter from "./router/api.ts";
 import { logger } from "./utils/logger.ts";
 

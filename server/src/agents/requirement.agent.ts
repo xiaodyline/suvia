@@ -1,8 +1,8 @@
 import { createAgent } from "langchain";
-import { model } from "../models/model.ts";
+import { model } from "../models/index.ts";
 import { requirementPrompt } from "../prompts/requirementPrompt.ts";
 import { logger } from "../utils/logger.ts";
-import { generateSrsImageTool } from "./image-agent.ts";
+import { generateSrsImageTool } from "../tools/srs-image.tool.ts";
 
 type RequirementWriterAgent = ReturnType<typeof createAgent>;
 

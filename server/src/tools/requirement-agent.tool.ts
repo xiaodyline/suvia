@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import * as z from "zod";
-import { getRequirementWriterAgent } from "../agents/requirement-agent.ts";
+import { getRequirementWriterAgent } from "../agents/requirement.agent.ts";
 import { logger } from "../utils/logger.ts";
 
 type UnknownRecord = Record<string, unknown>;

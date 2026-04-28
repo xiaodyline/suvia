@@ -1,9 +1,9 @@
 import { createAgent } from "langchain";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
-import { model } from "../models/model.ts";
+import { model } from "../models/index.ts";
 import { mainAgentPrompt } from "../prompts/mainAgentPrompt.ts";
 import { requirementWriterAgentTool } from "../tools/requirement-agent.tool.ts";
-import { initRequirementWriterAgent } from "./requirement-agent.ts";
+import { initRequirementWriterAgent } from "./requirement.agent.ts";
 
 type CreateMainAgentOptions = {
   checkpointer?: BaseCheckpointSaver;

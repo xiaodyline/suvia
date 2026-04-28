@@ -3,7 +3,7 @@ import {
   initCheckpointer,
 } from "../checkpoints/checkpointer.provider.ts";
 import { logger } from "../utils/logger.ts";
-import { createMainAgent, type MainAgent } from "./main-agent.ts";
+import { createMainAgent, type MainAgent } from "./main.agent.ts";
 
 let agent: MainAgent | undefined;
 let initializationPromise: Promise<MainAgent> | undefined;
