@@ -75,9 +75,15 @@ export const extractAiMessageDelta = (message: unknown): string => {
 };
 
 export const getLastMessage = (state: unknown): unknown => {
+  const messages = getMessagesFromState(state);
+
+  return messages?.at(-1);
+};
+
+export const getMessagesFromState = (state: unknown): unknown[] | undefined => {
   if (!isRecord(state) || !Array.isArray(state.messages)) {
     return undefined;
   }
 
-  return state.messages.at(-1);
+  return state.messages;
 };
