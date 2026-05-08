@@ -76,7 +76,7 @@ const ensureSqliteDirectory = (sqlitePath: string) => {
   mkdirSync(path.dirname(sqlitePath), { recursive: true });
 };
 
-const resolvePostgresUrl = () => {
+export const resolvePostgresUrl = () => {
   return (
     process.env.CHECKPOINT_POSTGRES_URL?.trim() ||
     process.env.DATABASE_URL?.trim() ||

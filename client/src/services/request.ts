@@ -7,7 +7,7 @@ export type RequestOptions = {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
-const buildUrl = (path: string) => {
+export const buildUrl = (path: string) => {
   if (/^https?:\/\//.test(path)) {
     return path;
   }
@@ -15,13 +15,21 @@ const buildUrl = (path: string) => {
   return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 };
 
+const isFormDataBody = (body: unknown): body is FormData => {
+  return typeof FormData !== "undefined" && body instanceof FormData;
+};
+
 export const request = async (path: string, options: RequestOptions = {}) => {
   const headers = new Headers(options.headers);
   let body: BodyInit | undefined;
 
   if (options.body !== undefined) {
-    headers.set("Content-Type", "application/json");
-    body = JSON.stringify(options.body);
+    if (isFormDataBody(options.body)) {
+      body = options.body;
+    } else {
+      headers.set("Content-Type", "application/json");
+      body = JSON.stringify(options.body);
+    }
   }
 
   const response = await fetch(buildUrl(path), {
@@ -32,7 +40,7 @@ export const request = async (path: string, options: RequestOptions = {}) => {
   });
 
   if (!response.ok) {
-    throw new Error(`请求失败：${response.status}`);
+    throw new Error(`Request failed: ${response.status}`);
   }
 
   return response;

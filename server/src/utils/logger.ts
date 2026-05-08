@@ -5,6 +5,7 @@ export type LogScope =
   | "AGENT"
   | "SERVER"
   | "CHAT"
+  | "FILES"
   | "TOOL"
   | "QUALITY";
 

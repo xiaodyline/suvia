@@ -1,0 +1,53 @@
+import type Koa from "koa";
+import { filesService, toApiFileRecord } from "./files.service.ts";
+
+type MultipartBody = {
+  purpose?: unknown;
+};
+
+const encodeContentDisposition = (filename: string) => {
+  const fallback = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+};
+
+export class FilesController {
+  async uploadFile(ctx: Koa.Context) {
+    const body = ctx.request.body as MultipartBody | undefined;
+    const record = await filesService.uploadFile(ctx.file, body?.purpose);
+
+    ctx.status = 201;
+    ctx.body = {
+      file: toApiFileRecord(record),
+    };
+  }
+
+  async listFiles(ctx: Koa.Context) {
+    const files = await filesService.listFiles();
+
+    ctx.body = {
+      files: files.map(toApiFileRecord),
+    };
+  }
+
+  async downloadFile(ctx: Koa.Context) {
+    const { record, stream } = await filesService.getDownloadStream(
+      ctx.params.fileId
+    );
+
+    ctx.set("Content-Type", record.mimeType);
+    ctx.set("Content-Length", String(record.sizeBytes));
+    ctx.set("Content-Disposition", encodeContentDisposition(record.originalName));
+    ctx.body = stream;
+  }
+
+  async getFileUrl(ctx: Koa.Context) {
+    const { record, url } = await filesService.getFileAccessUrl(ctx.params.fileId);
+
+    ctx.body = {
+      file: toApiFileRecord(record),
+      url,
+    };
+  }
+}
+
+export const filesController = new FilesController();
