@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Pool } from "pg";
+import { logger } from "../../utils/logger.ts";
 import { getFilesDatabaseUrl } from "./files.config.ts";
 import {
   getOssFileService,
@@ -18,7 +19,7 @@ import type {
   UploadedFileRow,
 } from "./files.types.ts";
 
-class FileNotFoundError extends Error {
+export class FileNotFoundError extends Error {
   status = 404;
   code = "FILE_NOT_FOUND";
 
@@ -27,6 +28,31 @@ class FileNotFoundError extends Error {
     this.name = "FileNotFoundError";
   }
 }
+
+const getErrorMessage = (error: unknown) => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const getIncomingUploadMeta = (
+  file: IncomingUploadedFile | undefined,
+  purpose: string
+) => ({
+  originalName: file?.originalname,
+  mimeType: file?.mimetype,
+  sizeBytes: file?.size,
+  purpose,
+});
+
+const getFileRecordLogMeta = (record: UploadedFileRecord) => ({
+  fileId: record.id,
+  originalName: record.originalName,
+  status: record.status,
+  ossPath: record.ossPath,
+});
+
+const isFileAccessReady = (status: UploadedFileRecord["status"]) => {
+  return status === "uploaded" || status === "ready";
+};
 
 let pool: Pool | undefined;
 let setupPromise: Promise<void> | undefined;
@@ -71,60 +97,108 @@ export class FilesService {
   }
 
   async uploadFile(file: IncomingUploadedFile | undefined, purposeValue: unknown) {
-    const validatedFile = validateUploadedFile(file);
     const purpose = normalizePurpose(purposeValue);
+    const uploadStartedAt = Date.now();
+    const uploadMeta = getIncomingUploadMeta(file, purpose);
 
-    await this.ensureTable();
+    try {
+      logger.info("FILES", "File validation started", uploadMeta);
 
-    const ossResult = await this.getOssService().uploadFile(validatedFile);
+      let validatedFile: ReturnType<typeof validateUploadedFile>;
 
-    const result = await getPool().query<UploadedFileRow>(
-      `
-        INSERT INTO uploaded_files (
-          id,
-          original_name,
-          stored_name,
-          file_ext,
-          mime_type,
-          size_bytes,
-          oss_bucket,
-          oss_path,
-          url,
+      try {
+        validatedFile = validateUploadedFile(file);
+        logger.info("FILES", "File validation passed", {
+          originalName: validatedFile.originalName,
+          fileExt: validatedFile.fileExt,
+        });
+      } catch (error) {
+        logger.warn("FILES", "File validation failed", {
+          originalName: file?.originalname,
+          error: getErrorMessage(error),
+        });
+        throw error;
+      }
+
+      await this.ensureTable();
+
+      const ossResult = await this.getOssService().uploadFile(validatedFile);
+
+      logger.info("FILES", "File metadata saving started", {
+        originalName: validatedFile.originalName,
+        ossPath: ossResult.ossPath,
+      });
+
+      const result = await getPool().query<UploadedFileRow>(
+        `
+          INSERT INTO uploaded_files (
+            id,
+            original_name,
+            stored_name,
+            file_ext,
+            mime_type,
+            size_bytes,
+            oss_bucket,
+            oss_path,
+            url,
+            purpose,
+            status,
+            error_message
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
+            $9,
+            $10,
+            'uploaded',
+            NULL
+          )
+          RETURNING *
+        `,
+        [
+          crypto.randomUUID(),
+          validatedFile.originalName,
+          ossResult.storedName,
+          validatedFile.fileExt,
+          validatedFile.mimeType,
+          validatedFile.sizeBytes,
+          ossResult.bucket,
+          ossResult.ossPath,
+          ossResult.url,
           purpose,
-          status,
-          error_message
-        )
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9,
-          $10,
-          'uploaded',
-          NULL
-        )
-        RETURNING *
-      `,
-      [
-        crypto.randomUUID(),
-        validatedFile.originalName,
-        ossResult.storedName,
-        validatedFile.fileExt,
-        validatedFile.mimeType,
-        validatedFile.sizeBytes,
-        ossResult.bucket,
-        ossResult.ossPath,
-        ossResult.url,
-        purpose,
-      ]
-    );
+        ]
+      ).catch((error) => {
+        logger.error("FILES", "File metadata save failed", error, {
+          originalName: validatedFile.originalName,
+          ossPath: ossResult.ossPath,
+        });
+        throw error;
+      });
 
-    return mapRowToRecord(result.rows[0]);
+      const record = mapRowToRecord(result.rows[0]);
+
+      logger.info("FILES", "File metadata saved", {
+        fileId: record.id,
+        status: record.status,
+      });
+      logger.info("FILES", "Upload completed", {
+        fileId: record.id,
+        originalName: record.originalName,
+        sizeBytes: record.sizeBytes,
+        durationMs: Date.now() - uploadStartedAt,
+      });
+
+      return record;
+    } catch (error) {
+      logger.error("FILES", "Upload failed", error, uploadMeta);
+      throw error;
+    }
   }
 
   async listFiles() {
@@ -143,22 +217,64 @@ export class FilesService {
   }
 
   async getDownloadStream(fileIdValue: string | undefined): Promise<FileDownloadResult> {
-    const record = await this.getFileRecord(fileIdValue);
-    const stream = await this.getOssService().getFileStream(record.ossPath);
+    const startedAt = Date.now();
+    let fileId = fileIdValue;
 
-    return {
-      record,
-      stream,
-    };
+    try {
+      fileId = validateFileId(fileIdValue);
+      const record = await this.getFileRecordForFileRequest(fileId);
+
+      logger.info("FILES", "Proxy download started", {
+        fileId,
+        ossPath: record.ossPath,
+      });
+
+      const stream = await this.getOssService().getFileStream(record.ossPath);
+
+      logger.info("FILES", "Proxy download completed", {
+        fileId,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        record,
+        stream,
+      };
+    } catch (error) {
+      logger.error("FILES", "Download failed", error, { fileId });
+      throw error;
+    }
   }
 
   async getFileAccessUrl(fileIdValue: string | undefined) {
-    const record = await this.getFileRecord(fileIdValue);
+    const startedAt = Date.now();
+    let fileId = fileIdValue;
 
-    return {
-      record,
-      url: this.getOssService().getAccessUrl(record.ossPath, record.url),
-    };
+    try {
+      fileId = validateFileId(fileIdValue);
+      const record = await this.getFileRecordForFileRequest(fileId);
+
+      logger.info("FILES", "Signed URL generating started", {
+        fileId,
+        ossPath: record.ossPath,
+      });
+
+      const url = this.getOssService().getAccessUrl(record.ossPath, record.url);
+
+      logger.info("FILES", "Signed URL generated", {
+        fileId,
+        expiresIn: this.getOssService().getSignedUrlExpiresSeconds(),
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        record,
+        url,
+      };
+    } catch (error) {
+      logger.error("FILES", "Signed URL generation failed", error, { fileId });
+      throw error;
+    }
   }
 
   async getFileRecord(fileIdValue: string | undefined) {
@@ -175,6 +291,10 @@ export class FilesService {
     }
 
     return mapRowToRecord(result.rows[0]);
+  }
+
+  async getOssFileStream(ossPath: string) {
+    return this.getOssService().getFileStream(ossPath);
   }
 
   async updateFileStatus(
@@ -234,6 +354,31 @@ export class FilesService {
     });
 
     return setupPromise;
+  }
+
+  private async getFileRecordForFileRequest(fileId: string) {
+    logger.info("FILES", "File metadata loading started", { fileId });
+
+    try {
+      const record = await this.getFileRecord(fileId);
+
+      logger.info("FILES", "File metadata loaded", getFileRecordLogMeta(record));
+
+      if (!isFileAccessReady(record.status)) {
+        logger.warn("FILES", "File status is not ready", {
+          fileId,
+          status: record.status,
+        });
+      }
+
+      return record;
+    } catch (error) {
+      if (error instanceof FileNotFoundError) {
+        logger.warn("FILES", "File not found", { fileId });
+      }
+
+      throw error;
+    }
   }
 }
 

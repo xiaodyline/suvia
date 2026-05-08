@@ -12,6 +12,12 @@ export type LogScope =
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogFields = Record<string, unknown>;
+type SanitizedValue =
+  | string
+  | number
+  | boolean
+  | SanitizedValue[]
+  | { [key: string]: SanitizedValue };
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 10,
@@ -21,6 +27,22 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 const DEFAULT_LOG_LEVEL: LogLevel = "info";
+const MAX_LOG_STRING_LENGTH = 300;
+
+const SENSITIVE_EXACT_KEYS = new Set([
+  "embedding",
+  "embeddings",
+  "queryembedding",
+  "vector",
+  "vectors",
+  "queryvector",
+  "buffer",
+  "buffers",
+  "content",
+  "contents",
+  "text",
+  "texts",
+]);
 
 const isLogLevel = (value: string): value is LogLevel => {
   return value in LOG_LEVELS;
@@ -40,33 +62,96 @@ const shouldLog = (level: LogLevel) => {
   return LOG_LEVELS[level] >= LOG_LEVELS[getLogLevel()];
 };
 
-const sanitizeFieldValue = (key: string, value: unknown): unknown => {
-  const normalizedKey = key.toLowerCase();
+const normalizeLogKey = (key: string) => {
+  return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+};
 
-  if (
-    normalizedKey.includes("password") ||
-    normalizedKey.includes("secret") ||
-    normalizedKey.includes("token")
-  ) {
-    return value ? "configured" : "not_configured";
+const isSensitiveLogKey = (key: string) => {
+  const normalizedKey = normalizeLogKey(key);
+
+  if (SENSITIVE_EXACT_KEYS.has(normalizedKey)) {
+    return true;
   }
 
-  if (normalizedKey.includes("api_key") || normalizedKey.includes("apikey")) {
-    return value ? "configured" : "not_configured";
+  return (
+    normalizedKey.includes("password") ||
+    normalizedKey.includes("secret") ||
+    normalizedKey.includes("token") ||
+    normalizedKey.includes("authorization") ||
+    normalizedKey.includes("apikey") ||
+    normalizedKey.includes("accesskey")
+  );
+};
+
+const truncateString = (value: string) => {
+  if (value.length <= MAX_LOG_STRING_LENGTH) {
+    return value;
+  }
+
+  return `${value.slice(0, MAX_LOG_STRING_LENGTH - 3)}...`;
+};
+
+const maskSensitiveTermsInText = (value: string) => {
+  return value.replace(
+    /\b(?:OSS_ACCESS_KEY_ID|OSS_ACCESS_KEY_SECRET|EMBEDDING_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|MODEL_API_KEY)\b/gi,
+    "[filtered]"
+  );
+};
+
+const sanitizeString = (value: string) => {
+  return truncateString(maskSensitiveTermsInText(maskDatabaseUrlsInText(value)));
+};
+
+const sanitizeFieldValue = (
+  key: string,
+  value: unknown
+): SanitizedValue | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (isSensitiveLogKey(key)) {
+    return undefined;
+  }
+
+  if (value instanceof Error) {
+    return sanitizeString(value.message);
   }
 
   if (typeof value === "string") {
-    return maskDatabaseUrlsInText(value);
+    return sanitizeString(value);
   }
 
-  return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => sanitizeFieldValue(String(index), item))
+      .filter((item): item is SanitizedValue => item !== undefined);
+  }
+
+  if (
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    const sanitizedEntries = Object.entries(value as LogFields)
+      .map(([entryKey, entryValue]) => [
+        entryKey,
+        sanitizeFieldValue(entryKey, entryValue),
+      ] as const)
+      .filter((entry): entry is readonly [string, SanitizedValue] => {
+        return entry[1] !== undefined;
+      });
+
+    return Object.fromEntries(sanitizedEntries) as { [key: string]: SanitizedValue };
+  }
+
+  return sanitizeString(JSON.stringify(value));
 };
 
-const formatValue = (value: unknown): string => {
-  if (value instanceof Error) {
-    return value.message;
-  }
-
+const formatValue = (value: SanitizedValue): string => {
   if (typeof value === "string") {
     return value;
   }
@@ -75,24 +160,22 @@ const formatValue = (value: unknown): string => {
     return String(value);
   }
 
-  if (value === null) {
-    return "null";
-  }
-
-  if (value === undefined) {
-    return "undefined";
-  }
-
   return JSON.stringify(value);
 };
 
-const formatFields = (fields?: LogFields) => {
+export const formatLogMeta = (fields?: LogFields) => {
   if (!fields) {
     return "";
   }
 
   return Object.entries(fields)
-    .map(([key, value]) => `${key}=${formatValue(sanitizeFieldValue(key, value))}`)
+    .map(([key, value]) => {
+      const sanitizedValue = sanitizeFieldValue(key, value);
+      return sanitizedValue === undefined
+        ? undefined
+        : `${key}=${formatValue(sanitizedValue)}`;
+    })
+    .filter((field): field is string => field !== undefined)
     .join(" ");
 };
 
@@ -129,7 +212,7 @@ const writeLog = (level: LogLevel, scope: LogScope, message: string, fields?: Lo
     return;
   }
 
-  const formattedFields = formatFields(fields);
+  const formattedFields = formatLogMeta(fields);
   const line = formattedFields
     ? `[${scope}] ${message} ${formattedFields}`
     : `[${scope}] ${message}`;

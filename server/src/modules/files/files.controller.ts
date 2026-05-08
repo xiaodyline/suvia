@@ -1,4 +1,5 @@
 import type Koa from "koa";
+import { logger } from "../../utils/logger.ts";
 import { filesService, toApiFileRecord } from "./files.service.ts";
 
 type MultipartBody = {
@@ -13,6 +14,13 @@ const encodeContentDisposition = (filename: string) => {
 export class FilesController {
   async uploadFile(ctx: Koa.Context) {
     const body = ctx.request.body as MultipartBody | undefined;
+    logger.info("FILES", "Upload request received", {
+      originalName: ctx.file?.originalname,
+      mimeType: ctx.file?.mimetype,
+      sizeBytes: ctx.file?.size,
+      purpose: body?.purpose,
+    });
+
     const record = await filesService.uploadFile(ctx.file, body?.purpose);
 
     ctx.status = 201;
@@ -30,6 +38,10 @@ export class FilesController {
   }
 
   async downloadFile(ctx: Koa.Context) {
+    logger.info("FILES", "Download request received", {
+      fileId: ctx.params.fileId,
+    });
+
     const { record, stream } = await filesService.getDownloadStream(
       ctx.params.fileId
     );
@@ -41,6 +53,10 @@ export class FilesController {
   }
 
   async getFileUrl(ctx: Koa.Context) {
+    logger.info("FILES", "File URL request received", {
+      fileId: ctx.params.fileId,
+    });
+
     const { record, url } = await filesService.getFileAccessUrl(ctx.params.fileId);
 
     ctx.body = {

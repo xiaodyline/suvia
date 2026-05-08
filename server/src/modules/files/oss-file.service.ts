@@ -2,6 +2,7 @@ import OSS from "ali-oss";
 import crypto from "node:crypto";
 import path from "node:path";
 import type { Readable } from "node:stream";
+import { logger } from "../../utils/logger.ts";
 import { getOssFileConfig, type OssFileConfig } from "./files.config.ts";
 import type { ValidatedUploadFile } from "./files.types.ts";
 
@@ -28,19 +29,39 @@ export class OssFileService {
 
   async uploadFile(file: ValidatedUploadFile): Promise<OssFileUploadResult> {
     const { ossPath, storedName } = this.createOssPath(file.fileExt);
+    const startedAt = Date.now();
 
-    const result = await this.client.put(ossPath, file.buffer, {
-      headers: {
-        "Content-Type": file.mimeType,
-      },
+    logger.info("FILES", "OSS upload started", {
+      originalName: file.originalName,
+      ossPath,
     });
 
-    return {
-      bucket: this.config.bucket,
-      ossPath,
-      storedName,
-      url: this.config.privateRead ? null : this.getPublicUrl(ossPath, result.url),
-    };
+    try {
+      const result = await this.client.put(ossPath, file.buffer, {
+        headers: {
+          "Content-Type": file.mimeType,
+        },
+      });
+
+      logger.info("FILES", "OSS upload completed", {
+        originalName: file.originalName,
+        ossPath,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        bucket: this.config.bucket,
+        ossPath,
+        storedName,
+        url: this.config.privateRead ? null : this.getPublicUrl(ossPath, result.url),
+      };
+    } catch (error) {
+      logger.error("FILES", "OSS upload failed", error, {
+        originalName: file.originalName,
+        ossPath,
+      });
+      throw error;
+    }
   }
 
   async getFileStream(ossPath: string): Promise<Readable> {
@@ -57,6 +78,10 @@ export class OssFileService {
     }
 
     return fallbackUrl || this.getPublicUrl(ossPath);
+  }
+
+  getSignedUrlExpiresSeconds() {
+    return this.config.signedUrlExpiresSeconds;
   }
 
   private createOssPath(fileExt: string) {

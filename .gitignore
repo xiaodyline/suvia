@@ -39,3 +39,4 @@ dist-ssr
 *.sw?
 
 dev-docs/
+ref-doc/

@@ -34,9 +34,17 @@ const handleRagErrors = async (ctx: Koa.Context, next: Koa.Next) => {
   } catch (error) {
     const httpError = error as HttpLikeError;
     const status = getErrorStatus(httpError);
+    const requestLogMeta = {
+      method: ctx.method,
+      path: ctx.path,
+      status,
+      error: httpError.message,
+    };
 
     if (status >= 500) {
-      logger.error("RAG", "RAG route failed", httpError);
+      logger.error("SERVER", "Request failed", requestLogMeta);
+    } else {
+      logger.warn("SERVER", "Request failed", requestLogMeta);
     }
 
     ctx.status = status;
@@ -62,4 +70,3 @@ ragRouter.get(
   ragController.getFileStatus.bind(ragController)
 );
 ragRouter.post("/rag/query", ragController.query.bind(ragController));
-

@@ -70,9 +70,23 @@ const handleFileErrors = async (ctx: Koa.Context, next: Koa.Next) => {
   } catch (error) {
     const httpError = error as HttpLikeError;
     const status = getErrorStatus(httpError);
+    const requestLogMeta = {
+      method: ctx.method,
+      path: ctx.path,
+      status,
+      error: httpError.message,
+    };
 
     if (status >= 500) {
-      logger.error("FILES", "File route failed", httpError);
+      logger.error("SERVER", "Request failed", requestLogMeta);
+    } else {
+      logger.warn("SERVER", "Request failed", requestLogMeta);
+    }
+
+    if (ctx.path.endsWith("/files/upload")) {
+      logger.warn("FILES", "Upload failed", {
+        error: httpError.message,
+      });
     }
 
     ctx.status = status;
