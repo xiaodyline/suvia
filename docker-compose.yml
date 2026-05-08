@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: suvia-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: suvia
+      POSTGRES_PASSWORD: suvia_password
+      POSTGRES_DB: suvia
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - suvia_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U suvia -d suvia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-init:
+    image: pgvector/pgvector:pg16
+    container_name: suvia-postgres-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: suvia_password
+    command: >
+      psql
+      -h postgres
+      -U suvia
+      -d suvia
+      -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    restart: "no"
+
+volumes:
+  suvia_postgres_data:
