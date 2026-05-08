@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Chat } from "./components/Chat";
 import { FileList } from "./components/FileList";
 import { FileUploadPanel } from "./components/FileUploadPanel";
+import { RagSearchPanel } from "./components/RagSearchPanel";
 import "./App.css";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
       <aside className="file-sidebar">
         <FileUploadPanel onUploadComplete={refreshFiles} />
         <FileList refreshKey={fileRefreshKey} />
+        <RagSearchPanel />
       </aside>
       <Chat />
     </div>

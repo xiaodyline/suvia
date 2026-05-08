@@ -239,6 +239,110 @@ body {
   font-size: 0.8125rem;
 }
 
+.rag-search-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.rag-search-form {
+  display: grid;
+  gap: 10px;
+}
+
+.rag-search-form textarea,
+.rag-topk-field input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.rag-search-form textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.rag-topk-field {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.rag-search-form button {
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.rag-search-form button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rag-results {
+  display: grid;
+  gap: 0;
+}
+
+.rag-result {
+  border-top: 1px solid #eef0f3;
+  padding: 10px 0;
+}
+
+.rag-result-header,
+.rag-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rag-result-header {
+  justify-content: space-between;
+  color: #111827;
+  font-size: 0.8125rem;
+}
+
+.rag-result-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rag-result-header span {
+  flex: 0 0 auto;
+  color: #166534;
+  font-weight: 700;
+}
+
+.rag-result-meta {
+  flex-wrap: wrap;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.rag-result p {
+  margin: 8px 0 0;
+  color: #374151;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .chat-shell {
   display: grid;
   grid-template-rows: 1fr auto;
