@@ -1,6 +1,6 @@
 import type { Readable } from "node:stream";
 
-export type UploadedFileStatus = "uploaded" | "failed";
+export type UploadedFileStatus = "uploaded" | "indexing" | "ready" | "failed";
 
 export type UploadedFileRecord = {
   id: string;

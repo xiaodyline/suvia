@@ -4,6 +4,7 @@ import cors from "@koa/cors";
 import bodyParser from "koa-bodyparser";
 import { initAgent } from "./agents/index.ts";
 import apiRouter from "./router/api.ts";
+import { ragService } from "./modules/rag/rag.service.ts";
 import { logger } from "./utils/logger.ts";
 
 const PORT = 3001;
@@ -28,6 +29,7 @@ const startServer = async () => {
   logger.info("BOOT", `NODE_ENV=${app.env}`);
   logger.info("BOOT", `Port=${PORT}`);
 
+  await ragService.initialize();
   await initAgent();
 
   await new Promise<void>((resolve, reject) => {

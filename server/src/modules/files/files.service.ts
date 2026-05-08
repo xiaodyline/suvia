@@ -161,7 +161,7 @@ export class FilesService {
     };
   }
 
-  private async getFileRecord(fileIdValue: string | undefined) {
+  async getFileRecord(fileIdValue: string | undefined) {
     await this.ensureTable();
 
     const fileId = validateFileId(fileIdValue);
@@ -177,7 +177,34 @@ export class FilesService {
     return mapRowToRecord(result.rows[0]);
   }
 
-  private async ensureTable() {
+  async updateFileStatus(
+    fileIdValue: string | undefined,
+    status: UploadedFileRecord["status"],
+    errorMessage: string | null = null
+  ) {
+    await this.ensureTable();
+
+    const fileId = validateFileId(fileIdValue);
+    const result = await getPool().query<UploadedFileRow>(
+      `
+        UPDATE uploaded_files
+        SET status = $2,
+            error_message = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [fileId, status, errorMessage]
+    );
+
+    if (!result.rows[0]) {
+      throw new FileNotFoundError(fileId);
+    }
+
+    return mapRowToRecord(result.rows[0]);
+  }
+
+  async ensureTable() {
     setupPromise ??= getPool().query(`
       CREATE TABLE IF NOT EXISTS uploaded_files (
         id UUID PRIMARY KEY,
