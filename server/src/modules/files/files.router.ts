@@ -11,13 +11,20 @@ type HttpLikeError = Error & {
   code?: string;
 };
 
-const upload = multer({
+type MulterOptionsWithCharset = NonNullable<Parameters<typeof multer>[0]> & {
+  defParamCharset?: string;
+};
+
+const uploadOptions: MulterOptionsWithCharset = {
   storage: multer.memoryStorage(),
+  defParamCharset: "utf8",
   limits: {
     fileSize: getFilesConfig().maxSizeBytes,
     files: 1,
   },
-});
+};
+
+const upload = multer(uploadOptions);
 
 const getErrorStatus = (error: HttpLikeError) => {
   if (error instanceof FileValidationError) {

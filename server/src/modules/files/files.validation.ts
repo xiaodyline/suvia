@@ -3,6 +3,7 @@ import {
   getFilesConfig,
   SUPPORTED_FILE_EXTENSIONS,
 } from "./files.config.ts";
+import { repairMojibakeFilename } from "./filename-encoding.util.ts";
 import type {
   IncomingUploadedFile,
   ValidatedUploadFile,
@@ -22,7 +23,10 @@ export class FileValidationError extends Error {
 export const normalizeOriginalName = (originalName: string) => {
   const withoutPath = originalName.split(/[\\/]/).pop() || originalName;
   const cleaned = withoutPath.replace(/\0/g, "").trim();
-  return cleaned || "uploaded-file";
+  const repaired = repairMojibakeFilename(cleaned);
+  const safeName = repaired.split(/[\\/]/).pop()?.replace(/\0/g, "").trim();
+
+  return safeName || "uploaded-file";
 };
 
 const getFileExtension = (filename: string) => {

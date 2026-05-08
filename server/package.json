@@ -10,6 +10,7 @@
     "debug": "node --inspect=9229 --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "debug:index": "tsx src/index.ts",
+    "test:filename-encoding": "tsx src/tests/filename-encoding.test.ts",
     "test:oss-upload": "tsx src/tests/oss-upload.test.ts"
   },
   "keywords": [],
