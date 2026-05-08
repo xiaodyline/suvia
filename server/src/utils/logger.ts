@@ -6,6 +6,7 @@ export type LogScope =
   | "SERVER"
   | "CHAT"
   | "FILES"
+  | "RAG"
   | "TOOL"
   | "QUALITY";
 
