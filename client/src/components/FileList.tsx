@@ -4,6 +4,7 @@ import {
   listFiles,
   type UploadedFile,
 } from "../services/fileApi";
+import { getRagFileStatus, startRagIndex, type RagIndexTask } from "../services/ragApi";
 
 type FileListProps = {
   refreshKey: number;
@@ -38,6 +39,8 @@ export function FileList({ refreshKey }: FileListProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     setIsLoading(true);
@@ -56,6 +59,50 @@ export function FileList({ refreshKey }: FileListProps) {
     void loadFiles();
   }, [loadFiles, refreshKey]);
 
+  useEffect(() => {
+    if (!files.some((file) => file.status === "indexing")) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void loadFiles();
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [files, loadFiles]);
+
+  const handleBuildIndex = async (file: UploadedFile) => {
+    setActiveFileId(file.id);
+    setActionMessage("");
+
+    try {
+      const result = await startRagIndex(file.id);
+      setActionMessage(formatTaskMessage(result.task));
+      await loadFiles();
+    } catch (error) {
+      setActionMessage(getErrorMessage(error));
+    } finally {
+      setActiveFileId(null);
+    }
+  };
+
+  const handleCheckStatus = async (file: UploadedFile) => {
+    setActiveFileId(file.id);
+    setActionMessage("");
+
+    try {
+      const result = await getRagFileStatus(file.id);
+      setActionMessage(
+        result.task ? formatTaskMessage(result.task) : "No index task found."
+      );
+      await loadFiles();
+    } catch (error) {
+      setActionMessage(getErrorMessage(error));
+    } finally {
+      setActiveFileId(null);
+    }
+  };
+
   return (
     <section className="file-panel file-list-panel">
       <div className="file-panel-header">
@@ -67,6 +114,7 @@ export function FileList({ refreshKey }: FileListProps) {
 
       {isLoading ? <p className="file-muted">Loading...</p> : null}
       {errorMessage ? <p className="file-error">{errorMessage}</p> : null}
+      {actionMessage ? <p className="file-action-message">{actionMessage}</p> : null}
 
       {!isLoading && !errorMessage && files.length === 0 ? (
         <p className="file-muted">No files yet.</p>
@@ -103,6 +151,22 @@ export function FileList({ refreshKey }: FileListProps) {
                     <a className="file-download-link" href={getFileDownloadUrl(file.id)}>
                       Download
                     </a>
+                    <button
+                      type="button"
+                      className="file-inline-button"
+                      onClick={() => void handleBuildIndex(file)}
+                      disabled={activeFileId === file.id || file.status === "indexing"}
+                    >
+                      {getIndexButtonText(file)}
+                    </button>
+                    <button
+                      type="button"
+                      className="file-inline-button file-inline-button-secondary"
+                      onClick={() => void handleCheckStatus(file)}
+                      disabled={activeFileId === file.id}
+                    >
+                      Status
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -113,3 +177,23 @@ export function FileList({ refreshKey }: FileListProps) {
     </section>
   );
 }
+
+const getIndexButtonText = (file: UploadedFile) => {
+  if (file.status === "indexing") {
+    return "Indexing";
+  }
+
+  return file.status === "ready" || file.status === "failed"
+    ? "Rebuild"
+    : "Build";
+};
+
+const formatTaskMessage = (task: RagIndexTask) => {
+  const base = `Index ${task.status}. Chunks: ${task.chunkCount}.`;
+
+  if (task.status === "failed" && task.errorMessage) {
+    return `${base} ${task.errorMessage}`;
+  }
+
+  return base;
+};

@@ -188,7 +188,19 @@ body {
   color: #b91c1c;
 }
 
+.file-status-indexing {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.file-status-ready {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .file-download-link {
+  display: inline-flex;
+  margin-right: 8px;
   color: #1d4ed8;
   font-weight: 700;
   text-decoration: none;
@@ -196,6 +208,35 @@ body {
 
 .file-download-link:hover {
   text-decoration: underline;
+}
+
+.file-inline-button {
+  height: 28px;
+  margin-right: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.file-inline-button-secondary {
+  background: #eef2f7;
+  color: #374151;
+}
+
+.file-inline-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.file-action-message {
+  margin: 10px 0 0;
+  color: #374151;
+  font-size: 0.8125rem;
 }
 
 .chat-shell {

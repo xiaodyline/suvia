@@ -1,6 +1,6 @@
 import { buildUrl, request } from "./request";
 
-export type UploadedFileStatus = "uploaded" | "failed";
+export type UploadedFileStatus = "uploaded" | "indexing" | "ready" | "failed";
 
 export type UploadedFile = {
   id: string;
